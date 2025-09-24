@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/note.dart';
+import '../utils/validators.dart';
 
 class ApiService {
   final String baseUrl = "https://jsonplaceholder.typicode.com";
@@ -32,6 +33,13 @@ class ApiService {
 
   Future<Note> createNote(Note note) async {
     try {
+      //  central validators
+      final titleError = Validators.validateTitle(note.title);
+      final bodyError = Validators.validateBody(note.body);
+
+      if (titleError != null) throw Exception(titleError);
+      if (bodyError != null) throw Exception(bodyError);
+
       final response = await http.post(
         Uri.parse("$baseUrl/posts"),
         headers: {
@@ -51,6 +59,7 @@ class ApiService {
       throw Exception("Error creating note: $e");
     }
   }
+
 
   Future<Note> updateNote(Note note) async {
     try {
