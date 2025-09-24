@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kodit/utils/validators.dart';
 import 'models/note.dart';
 import 'services/api_service.dart';
 
@@ -75,29 +76,30 @@ class _NotesPageState extends State<NotesPage> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final String title = titleController.text.trim();
-                final String body = bodyController.text.trim();
+                final title = titleController.text.trim();
+                final body = bodyController.text.trim();
 
-                if (title.isEmpty || body.isEmpty) return;
+                final titleError = Validators.validateTitle(title);
+                final bodyError = Validators.validateBody(body);
+
+                if (titleError != null || bodyError != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(titleError ?? bodyError!)),
+                  );
+                  return;
+                }
 
                 try {
-                  if (note == null) {
-                    // Create
-                    await api.createNote(
-                        Note(id: 0, title: title, body: body));
-                  } else {
-                    // Update
-                    await api.updateNote(
-                        Note(id: note.id, title: title, body: body));
-                  }
+                  await api.createNote(Note(id: 0, title: title, body: body));
                   _refreshNotes();
                   Navigator.pop(context);
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error: $e")),
+                    SnackBar(content: Text(e.toString())),
                   );
                 }
               },
+
               child: const Text("Save"),
             ),
           ],
