@@ -1,103 +1,79 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/note.dart';
-import '../utils/validators.dart';
+const String baseUrl = "https://jsonplaceholder.typicode.com";
 
-class ApiService {
-  final String baseUrl = "https://jsonplaceholder.typicode.com";
+// Read
+Future<List<Note>> fetchNotes() async {
+  final response = await http.get(
+    Uri.parse("$baseUrl/posts"),
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'FlutterApp',
+    },
+  );
 
-  Future<List<Note>> fetchNotes() async {
-    try {
-      final response = await http.get(
-        Uri.parse("$baseUrl/posts"),
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "FlutterApp",
-        },
-      );
-
-      print("Status code: ${response.statusCode}");
-
-      if (response.statusCode == 200) {
-        List data = json.decode(response.body);
-        return data.map((note) => Note.fromJson(note)).toList();
-      } else {
-        throw Exception(
-            "Failed to load notes. Status code: ${response.statusCode}");
-      }
-    } catch (e) {
-      print("Error fetching notes: $e");
-      throw Exception("Error fetching notes: $e");
-    }
+  if (response.statusCode == 200) {
+    final List<dynamic> jsonList = json.decode(response.body);
+    return jsonList.map((json) => Note.fromJson(json)).toList();
+  } else {
+    throw Exception('Failed to load notes');
   }
+}
 
-  Future<Note> createNote(Note note) async {
-    try {
-      //  central validators
-      final titleError = Validators.validateTitle(note.title);
-      final bodyError = Validators.validateBody(note.body);
+// Create
+Future<Note> addNote(String title, String body) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/posts"),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: json.encode({
+      'title': title,
+      'body': body,
+      'userId': 1,
+    }),
+  );
 
-      if (titleError != null) throw Exception(titleError);
-      if (bodyError != null) throw Exception(bodyError);
-
-      final response = await http.post(
-        Uri.parse("$baseUrl/posts"),
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "FlutterApp",
-        },
-        body: json.encode(note.toJson()),
-      );
-
-      if (response.statusCode == 201) {
-        return Note.fromJson(json.decode(response.body));
-      } else {
-        throw Exception(
-            "Failed to create note. Status code: ${response.statusCode}");
-      }
-    } catch (e) {
-      throw Exception("Error creating note: $e");
-    }
+  if (response.statusCode == 201) {
+    return Note.fromJson(json.decode(response.body));
+  } else {
+    throw Exception('Failed to add note');
   }
+}
 
+// Update
+Future<Note> updateNote(int id, String title, String body) async {
+  final response = await http.put(
+    Uri.parse("$baseUrl/posts/$id"),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: json.encode({
+      'id': id,
+      'title': title,
+      'body': body,
+      'userId': 1,
+    }),
+  );
 
-  Future<Note> updateNote(Note note) async {
-    try {
-      final response = await http.put(
-        Uri.parse("$baseUrl/posts/${note.id}"),
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "FlutterApp",
-        },
-        body: json.encode(note.toJson()),
-      );
-
-      if (response.statusCode == 200) {
-        return Note.fromJson(json.decode(response.body));
-      } else {
-        throw Exception(
-            "Failed to update note. Status code: ${response.statusCode}");
-      }
-    } catch (e) {
-      throw Exception("Error updating note: $e");
-    }
+  if (response.statusCode == 200) {
+    return Note.fromJson(json.decode(response.body));
+  } else {
+    throw Exception('Failed to update note');
   }
+}
 
-  Future<void> deleteNote(int id) async {
-    try {
-      final response = await http.delete(
-        Uri.parse("$baseUrl/posts/$id"),
-        headers: {
-          "User-Agent": "FlutterApp",
-        },
-      );
+// Delete
+Future<void> deleteNote(int id) async {
+  final response = await http.delete(
+    Uri.parse("$baseUrl/posts/$id"),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-            "Failed to delete note. Status code: ${response.statusCode}");
-      }
-    } catch (e) {
-      throw Exception("Error deleting note: $e");
-    }
+  if (response.statusCode != 200) {
+    throw Exception('Failed to delete note');
   }
 }

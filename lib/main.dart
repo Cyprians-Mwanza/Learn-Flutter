@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kodit/utils/validators.dart';
 import 'models/note.dart';
 import 'services/api_service.dart';
 
@@ -13,7 +12,7 @@ class NotesApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Notes App',
+      title: 'Notes Demo',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const NotesPage(),
       debugShowCheckedModeBanner: false,
@@ -29,78 +28,66 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final ApiService api = ApiService();
-  late Future<List<Note>> notes;
+  late Future<List<Note>> _notesFuture;
+  List<Note> _notes = [];
 
   @override
   void initState() {
     super.initState();
-    _refreshNotes();
+    _notesFuture = fetchNotes();
   }
 
-  void _refreshNotes() {
+  Future<void> _refreshNotes() async {
+    final fetched = await fetchNotes();
     setState(() {
-      notes = api.fetchNotes();
+      _notes = fetched;
     });
   }
 
-  // Show dialog for creating or editing note
-  Future<void> _showNoteDialog({Note? note}) async {
-    final TextEditingController titleController =
-    TextEditingController(text: note?.title ?? "");
-    final TextEditingController bodyController =
-    TextEditingController(text: note?.body ?? "");
+  // Add Note
+  void _addNoteDialog() {
+    final titleController = TextEditingController();
+    final bodyController = TextEditingController();
 
-    await showDialog(
+    showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(note == null ? "Add Note" : "Edit Note"),
+          title: const Text('Add Note'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: titleController,
-                decoration: const InputDecoration(labelText: "Enter your Title"),
+                decoration: const InputDecoration(labelText: 'Title'),
               ),
               TextField(
                 controller: bodyController,
-                decoration: const InputDecoration(labelText: "Enter your Body"),
+                decoration: const InputDecoration(labelText: 'Body'),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
-                final title = titleController.text.trim();
-                final body = bodyController.text.trim();
+                final newNote = await addNote(
+                  titleController.text,
+                  bodyController.text,
+                );
+                setState(() {
+                  _notes.insert(0, newNote);
+                });
+                Navigator.pop(context);
 
-                final titleError = Validators.validateTitle(title);
-                final bodyError = Validators.validateBody(body);
-
-                if (titleError != null || bodyError != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(titleError ?? bodyError!)),
-                  );
-                  return;
-                }
-
-                try {
-                  await api.createNote(Note(id: 0, title: title, body: body));
-                  _refreshNotes();
-                  Navigator.pop(context);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString())),
-                  );
-                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Note added')),
+                );
               },
-
-              child: const Text("Save"),
+              child: const Text('Save'),
             ),
           ],
         );
@@ -108,13 +95,87 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 
-  void _deleteNote(Note note) async {
+  // Update Note
+  void _editNoteDialog(Note note, int index) {
+    final titleController = TextEditingController(text: note.title);
+    final bodyController = TextEditingController(text: note.body);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Note'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+              ),
+              TextField(
+                controller: bodyController,
+                decoration: const InputDecoration(labelText: 'Body'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final updated = await updateNote(
+                  note.id,
+                  titleController.text,
+                  bodyController.text,
+                );
+
+                setState(() {
+                  _notes[index] = updated;
+                });
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Note updated')),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Delete Note
+  Future<void> _deleteNoteHandler(Note note, int index) async {
+    setState(() {
+      _notes.removeAt(index);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Note deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            setState(() {
+              _notes.insert(index, note);
+            });
+          },
+        ),
+      ),
+    );
+
     try {
-      await api.deleteNote(note.id);
-      _refreshNotes();
+      await deleteNote(note.id);
     } catch (e) {
+      setState(() {
+        _notes.insert(index, note);
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error deleting note: $e")),
+        SnackBar(content: Text('Failed to delete: $e')),
       );
     }
   }
@@ -122,59 +183,64 @@ class _NotesPageState extends State<NotesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Notes")),
+      appBar: AppBar(title: const Text('Notes')),
       body: FutureBuilder<List<Note>>(
-        future: notes,
+        future: _notesFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && _notes.isEmpty) {
             return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
+          }
+
+          if (snapshot.hasError && _notes.isEmpty) {
             return Center(
-                child: Text(
-                    "Failed to load notes.\n${snapshot.error}\nPull down to retry."));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async => _refreshNotes(),
-              child: ListView(
-                children: const [
-                  SizedBox(height: 200),
-                  Center(child: Text("No notes found")),
-                ],
-              ),
-            );
-          } else {
-            return RefreshIndicator(
-              onRefresh: () async => _refreshNotes(),
-              child: ListView.builder(
-                itemCount: snapshot.data!.length,
-                itemBuilder: (context, index) {
-                  final note = snapshot.data![index];
-                  return ListTile(
-                    title: Text(note.title),
-                    subtitle: Text(note.body),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.orange),
-                          onPressed: () => _showNoteDialog(note: note),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _deleteNote(note),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red),
               ),
             );
           }
+
+          if (_notes.isEmpty && snapshot.hasData) {
+            _notes = snapshot.data!;
+          }
+
+          if (_notes.isEmpty) {
+            return const Center(child: Text('No notes found'));
+          }
+
+          return RefreshIndicator(
+            onRefresh: _refreshNotes,
+            child: ListView.builder(
+              itemCount: _notes.length,
+              itemBuilder: (context, index) {
+                final note = _notes[index];
+                return Dismissible(
+                  key: ValueKey(note.id),
+                  background: Container(color: Colors.red),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => _deleteNoteHandler(note, index),
+                  child: ListTile(
+                    title: Text(note.title),
+                    subtitle: Text(
+                      note.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    leading: CircleAvatar(child: Text('${note.id}')),
+                    onTap: () => _editNoteDialog(note, index),
+                  ),
+                );
+              },
+            ),
+          );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNoteDialog(),
-        child: const Icon(Icons.add),
+
+      // Floating Action Button (Add Notes)
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addNoteDialog,
+        // icon: const Icon(Icons.add),
+        label: const Text("Add Notes"),
       ),
     );
   }
