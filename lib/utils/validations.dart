@@ -1,5 +1,4 @@
 class ValidationUtils {
-  // Validate title
   static String? validateTitle(String? value) {
     if (value == null || value.isEmpty) {
       return 'Title is required';
@@ -13,7 +12,6 @@ class ValidationUtils {
     return null;
   }
 
-  // Validate body
   static String? validateBody(String? value) {
     if (value == null || value.isEmpty) {
       return 'Body is required';
@@ -27,21 +25,6 @@ class ValidationUtils {
     return null;
   }
 
-  // Validate both title and body
-  static Map<String, String?> validateNote(String? title, String? body) {
-    return {
-      'title': validateTitle(title),
-      'body': validateBody(body),
-    };
-  }
-
-  // Check if note is valid (no errors)
-  static bool isNoteValid(String? title, String? body) {
-    final errors = validateNote(title, body);
-    return errors['title'] == null && errors['body'] == null;
-  }
-
-  // Check if note content has changed
   static bool hasChanges(String originalTitle, String originalBody, String newTitle, String newBody) {
     return originalTitle != newTitle || originalBody != newBody;
   }

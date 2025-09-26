@@ -45,7 +45,6 @@ class _NotesPageState extends State<NotesPage> {
     });
   }
 
-  // Add Note
   void _addNoteDialog() {
     final titleController = TextEditingController();
     final bodyController = TextEditingController();
@@ -113,7 +112,6 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 
-  // Update Note
   void _editNoteDialog(Note note, int index) {
     final titleController = TextEditingController(text: note.title);
     final bodyController = TextEditingController(text: note.body);
@@ -155,10 +153,10 @@ class _NotesPageState extends State<NotesPage> {
                 if (_editFormKey.currentState?.validate() ?? false) {
                   // Check if there are actual changes
                   if (!ValidationUtils.hasChanges(
-                      note.title,
-                      note.body,
-                      titleController.text,
-                      bodyController.text
+                    note.title,
+                    note.body,
+                    titleController.text,
+                    bodyController.text,
                   )) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -197,7 +195,6 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 
-  // Delete Note
   Future<void> _deleteNoteHandler(Note note, int index) async {
     setState(() {
       _notes.removeAt(index);
@@ -263,8 +260,19 @@ class _NotesPageState extends State<NotesPage> {
               itemCount: _notes.length,
               itemBuilder: (context, index) {
                 final note = _notes[index];
-                return Card(
+                return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
                   child: ListTile(
                     title: Text(note.title),
                     subtitle: Text(
@@ -272,17 +280,33 @@ class _NotesPageState extends State<NotesPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    leading: CircleAvatar(child: Text('${note.id}')),
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blue.shade50,
+                      child: Text(
+                        '${note.id}',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blue),
-                          onPressed: () => _editNoteDialog(note, index),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => _editNoteDialog(note, index),
+                            child: const Icon(Icons.edit, color: Colors.blue, size: 22),
+                          ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _showDeleteConfirmation(note, index),
+                        const SizedBox(width: 16),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => _showDeleteConfirmation(note, index),
+                            child: const Icon(Icons.delete, color: Colors.red, size: 22),
+                          ),
                         ),
                       ],
                     ),
@@ -294,7 +318,6 @@ class _NotesPageState extends State<NotesPage> {
         },
       ),
 
-      // Floating Action Button (Add Notes)
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addNoteDialog,
         label: const Text("Add Notes"),
@@ -302,7 +325,6 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 
-  // Show delete confirmation dialog
   void _showDeleteConfirmation(Note note, int index) {
     showDialog(
       context: context,

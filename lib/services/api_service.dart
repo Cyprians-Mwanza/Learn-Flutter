@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import '../models/note.dart';
 const String baseUrl = "https://jsonplaceholder.typicode.com";
 
-// Read
 Future<List<Note>> fetchNotes() async {
   final response = await http.get(
     Uri.parse("$baseUrl/posts"),
@@ -21,7 +20,6 @@ Future<List<Note>> fetchNotes() async {
   }
 }
 
-// Create
 Future<Note> addNote(String title, String body) async {
   final response = await http.post(
     Uri.parse("$baseUrl/posts"),
@@ -42,7 +40,6 @@ Future<Note> addNote(String title, String body) async {
   }
 }
 
-// Update
 Future<Note> updateNote(int id, String title, String body) async {
   final response = await http.put(
     Uri.parse("$baseUrl/posts/$id"),
@@ -64,7 +61,6 @@ Future<Note> updateNote(int id, String title, String body) async {
   }
 }
 
-// Delete
 Future<void> deleteNote(int id) async {
   final response = await http.delete(
     Uri.parse("$baseUrl/posts/$id"),
