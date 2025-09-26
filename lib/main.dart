@@ -151,7 +151,6 @@ class _NotesPageState extends State<NotesPage> {
             ElevatedButton(
               onPressed: () async {
                 if (_editFormKey.currentState?.validate() ?? false) {
-                  // Check if there are actual changes
                   if (!ValidationUtils.hasChanges(
                     note.title,
                     note.body,
