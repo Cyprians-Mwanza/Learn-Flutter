@@ -29,20 +29,38 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  late Future<List<Note>> _notesFuture;
   List<Note> _notes = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _notesFuture = fetchNotes();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final notes = await fetchNotes();
+      setState(() {
+        _notes = notes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _refreshNotes() async {
-    final fetched = await fetchNotes();
-    setState(() {
-      _notes = fetched;
-    });
+    await _loadNotes();
   }
 
   void _addNoteDialog() {
@@ -229,97 +247,95 @@ class _NotesPageState extends State<NotesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Notes')),
-      body: FutureBuilder<List<Note>>(
-        future: _notesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && _notes.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError && _notes.isEmpty) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
-
-          if (_notes.isEmpty && snapshot.hasData) {
-            _notes = snapshot.data!;
-          }
-
-          if (_notes.isEmpty) {
-            return const Center(child: Text('No notes found'));
-          }
-
-          return RefreshIndicator(
-            onRefresh: _refreshNotes,
-            child: ListView.builder(
-              itemCount: _notes.length,
-              itemBuilder: (context, index) {
-                final note = _notes[index];
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    title: Text(note.title),
-                    subtitle: Text(
-                      note.body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blue.shade50,
-                      child: Text(
-                        '${note.id}',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () => _editNoteDialog(note, index),
-                            child: const Icon(Icons.edit, color: Colors.blue, size: 22),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () => _showDeleteConfirmation(note, index),
-                            child: const Icon(Icons.delete, color: Colors.red, size: 22),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
-
+      body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addNoteDialog,
         label: const Text("Add Notes"),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading && _notes.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null && _notes.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Error: $_error',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadNotes,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_notes.isEmpty) {
+      return const Center(child: Text('No notes found'));
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshNotes,
+      child: ListView.builder(
+        itemCount: _notes.length,
+        itemBuilder: (context, index) {
+          final note = _notes[index];
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: ListTile(
+              title: Text(note.title),
+              subtitle: Text(
+                note.body,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              leading: CircleAvatar(
+                backgroundColor: Colors.blue.shade50,
+                child: Text(
+                  '${note.id}',
+                  style: TextStyle(
+                    color: Colors.blue.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () => _editNoteDialog(note, index),
+                    icon: const Icon(Icons.edit, color: Colors.blue, size: 22),
+                  ),
+                  IconButton(
+                    onPressed: () => _showDeleteConfirmation(note, index),
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
