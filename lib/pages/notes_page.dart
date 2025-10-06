@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/note.dart';
 import '../services/api_service.dart';
-import '../utils/validations.dart';
+import 'NoteDetailPage.dart';
 
 class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
@@ -11,26 +11,28 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  List<Note> _notes = [];
+  Note? _note;
   bool _isLoading = true;
   String? _error;
+
+  final int noteIdToDisplay = 1;
 
   @override
   void initState() {
     super.initState();
-    _loadNotes();
+    _loadNote();
   }
 
-  Future<void> _loadNotes() async {
+  Future<void> _loadNote() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final notes = await fetchNotes();
+      final note = await fetchNoteById(noteIdToDisplay);
       setState(() {
-        _notes = notes;
+        _note = note;
         _isLoading = false;
       });
     } catch (e) {
@@ -41,208 +43,20 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
-  Future<void> _refreshNotes() async {
-    await _loadNotes();
-  }
-
-  void _addNoteDialog() {
-    final titleController = TextEditingController();
-    final bodyController = TextEditingController();
-    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Note'),
-          content: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                  validator: ValidationUtils.validateTitle,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                ),
-                TextFormField(
-                  controller: bodyController,
-                  decoration: const InputDecoration(labelText: 'Body'),
-                  maxLines: 3,
-                  validator: ValidationUtils.validateBody,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_formKey.currentState?.validate() ?? false) {
-                  try {
-                    final newNote = await addNote(
-                      titleController.text,
-                      bodyController.text,
-                    );
-                    setState(() {
-                      _notes.insert(0, newNote);
-                    });
-                    Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Note added')),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to add note: $e')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _editNoteDialog(Note note, int index) {
-    final titleController = TextEditingController(text: note.title);
-    final bodyController = TextEditingController(text: note.body);
-    final GlobalKey<FormState> _editFormKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Note'),
-          content: Form(
-            key: _editFormKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                  validator: ValidationUtils.validateTitle,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                ),
-                TextFormField(
-                  controller: bodyController,
-                  decoration: const InputDecoration(labelText: 'Body'),
-                  maxLines: 3,
-                  validator: ValidationUtils.validateBody,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_editFormKey.currentState?.validate() ?? false) {
-                  if (!ValidationUtils.hasChanges(
-                    note.title,
-                    note.body,
-                    titleController.text,
-                    bodyController.text,
-                  )) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('No changes made')),
-                    );
-                    return;
-                  }
-
-                  try {
-                    final updated = await updateNote(
-                      note.id,
-                      titleController.text,
-                      bodyController.text,
-                    );
-
-                    setState(() {
-                      _notes[index] = updated;
-                    });
-                    Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Note updated')),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to update note: $e')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _deleteNoteHandler(Note note, int index) async {
-    setState(() {
-      _notes.removeAt(index);
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Note deleted'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            setState(() {
-              _notes.insert(index, note);
-            });
-          },
-        ),
-      ),
-    );
-
-    try {
-      await deleteNote(note.id);
-    } catch (e) {
-      setState(() {
-        _notes.insert(index, note);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete: $e')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Notes')),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addNoteDialog,
-        label: const Text("Add Notes"),
-      ),
     );
   }
 
   Widget _buildBody() {
-    if (_isLoading && _notes.isEmpty) {
+    if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null && _notes.isEmpty) {
+    if (_error != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -254,7 +68,7 @@ class _NotesPageState extends State<NotesPage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadNotes,
+              onPressed: _loadNote,
               child: const Text('Retry'),
             ),
           ],
@@ -262,85 +76,63 @@ class _NotesPageState extends State<NotesPage> {
       );
     }
 
-    if (_notes.isEmpty) {
-      return const Center(child: Text('No notes found'));
+    if (_note == null) {
+      return const Center(child: Text('Note not found'));
     }
 
-    return RefreshIndicator(
-      onRefresh: _refreshNotes,
-      child: ListView.builder(
-        itemCount: _notes.length,
-        itemBuilder: (context, index) {
-          final note = _notes[index];
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
             ),
-            child: ListTile(
-              title: Text(note.title),
-              subtitle: Text(
-                note.body,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              leading: CircleAvatar(
-                backgroundColor: Colors.blue.shade50,
-                child: Text(
-                  '${note.id}',
-                  style: TextStyle(
-                    color: Colors.blue.shade700,
-                    fontSize: 12,
-                  ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.blue.shade50,
+              radius: 28,
+              child: Text(
+                '${_note!.id}',
+                style: TextStyle(
+                  color: Colors.blue.shade700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    onPressed: () => _editNoteDialog(note, index),
-                    icon: const Icon(Icons.edit, color: Colors.blue, size: 22),
-                  ),
-                  IconButton(
-                    onPressed: () => _showDeleteConfirmation(note, index),
-                    icon: const Icon(Icons.delete, color: Colors.red, size: 22),
-                  ),
-                ],
-              ),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(Note note, int index) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Note'),
-        content: const Text('Are you sure you want to delete this note?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteNoteHandler(note, index);
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              _note!.title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NoteDetailPage(note: _note!),
+                  ),
+                );
+              },
+              child: const Text("View More Details"),
+            ),
+          ],
+        ),
       ),
     );
   }
